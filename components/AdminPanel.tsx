@@ -8,7 +8,9 @@ interface AdminPanelProps {
 }
 
 const AdminPanel: React.FC<AdminPanelProps> = ({ videos, setVideos }) => {
-  const [activeTab, setActiveTab] = useState<'videos'>('videos');
+  const [activeTab, setActiveTab] = useState<'videos' | 'sql'>('videos');
+  const [sqlQuery, setSqlQuery] = useState('');
+  const [sqlResults, setSqlResults] = useState<any[]>([]);
   const [formData, setFormData] = useState({ title: '', description: '', url: '' });
   const [editingId, setEditingId] = useState<string | null>(null);
 
@@ -79,6 +81,20 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ videos, setVideos }) => {
     }
   };
 
+  const handleSqlQuery = () => {
+    try {
+      // Mock SQL execution - replace with actual database query
+      const mockResults = [
+        { id: 1, title: 'Sample Video 1', views: 150 },
+        { id: 2, title: 'Sample Video 2', views: 89 }
+      ];
+      setSqlResults(mockResults);
+    } catch (error) {
+      console.error('SQL Query Error:', error);
+      setSqlResults([]);
+    }
+  };
+
   return (
     <div className="max-w-5xl mx-auto px-4 py-8">
       <div className="mb-8">
@@ -86,15 +102,35 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ videos, setVideos }) => {
         <p className="text-slate-500">Manage support video content.</p>
       </div>
 
-      {/* Header */}
+      {/* Tabs */}
       <div className="mb-8">
-        <div className="flex items-center gap-2 text-blue-600">
-          <VideoIcon size={24} />
-          <h2 className="text-xl font-semibold">Video Library</h2>
+        <div className="flex space-x-1 bg-slate-100 p-1 rounded-xl">
+          <button
+            onClick={() => setActiveTab('videos')}
+            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+              activeTab === 'videos'
+                ? 'bg-white text-blue-600 shadow-sm'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <VideoIcon size={18} className="inline mr-2" />
+            Videos
+          </button>
+          <button
+            onClick={() => setActiveTab('sql')}
+            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+              activeTab === 'sql'
+                ? 'bg-white text-blue-600 shadow-sm'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            SQL Query
+          </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      {activeTab === 'videos' ? (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* Add/Edit Video Form */}
             <div className="lg:col-span-1">
               <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 sticky top-6">
@@ -211,7 +247,59 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ videos, setVideos }) => {
                 ))
               )}
             </div>
-      </div>
+        </div>
+      ) : (
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+          <h3 className="text-lg font-semibold mb-4">SQL Query Interface</h3>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">SQL Query</label>
+              <textarea
+                value={sqlQuery}
+                onChange={(e) => setSqlQuery(e.target.value)}
+                rows={6}
+                className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-mono text-sm"
+                placeholder="SELECT * FROM videos WHERE..."
+              />
+            </div>
+            <button
+              onClick={handleSqlQuery}
+              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              Execute Query
+            </button>
+            {sqlResults.length > 0 && (
+              <div className="mt-6">
+                <h4 className="text-md font-semibold mb-2">Results:</h4>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full border border-slate-200 rounded-lg">
+                    <thead className="bg-slate-50">
+                      <tr>
+                        {Object.keys(sqlResults[0]).map(key => (
+                          <th key={key} className="px-4 py-2 text-left text-sm font-medium text-slate-700 border-b">
+                            {key}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {sqlResults.map((row, index) => (
+                        <tr key={index} className="border-b">
+                          {Object.values(row).map((value, i) => (
+                            <td key={i} className="px-4 py-2 text-sm text-slate-600">
+                              {String(value)}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
