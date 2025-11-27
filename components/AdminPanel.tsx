@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Video } from '../types';
-import { Save, Plus, Trash2, Video as VideoIcon, Youtube, Pencil, X } from 'lucide-react';
-import { saveSqlQueries, loadSqlQueries } from '../services/firebaseService';
+import { Save, Plus, Trash2, Video as VideoIcon, Youtube, Pencil, X, Database } from 'lucide-react';
+import { saveSqlQueries, loadSqlQueries, saveLinks, loadLinks } from '../services/firebaseService';
 
 interface AdminPanelProps {
   videos: Video[];
@@ -9,7 +9,7 @@ interface AdminPanelProps {
 }
 
 const AdminPanel: React.FC<AdminPanelProps> = ({ videos, setVideos }) => {
-  const [activeTab, setActiveTab] = useState<'videos' | 'sql'>('videos');
+  const [activeTab, setActiveTab] = useState<'videos' | 'sql' | 'links'>('videos');
   const [sqlQueries, setSqlQueries] = useState<{id: string, title: string, query: string}[]>([]);
   const [sqlForm, setSqlForm] = useState({title: '', query: ''});
   const [showSqlForm, setShowSqlForm] = useState(false);
@@ -22,15 +22,23 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ videos, setVideos }) => {
   const [showChannelVideos, setShowChannelVideos] = useState(false);
   const [loading, setLoading] = useState(false);
   const [dataLoaded, setDataLoaded] = useState(false);
+  const [notification, setNotification] = useState<{message: string, type: 'success' | 'error' | 'info'} | null>(null);
+  const [links, setLinks] = useState<{id: string, title: string, url: string, description: string}[]>([]);
+  const [linkForm, setLinkForm] = useState({title: '', url: '', description: ''});
+  const [showLinkForm, setShowLinkForm] = useState(false);
+  const [editingLinkId, setEditingLinkId] = useState<string | null>(null);
   
   useEffect(() => {
     const loadData = async () => {
       try {
         const loadedQueries = await loadSqlQueries();
         setSqlQueries(loadedQueries);
+        const loadedLinks = await loadLinks();
+        setLinks(loadedLinks);
       } catch (error) {
-        console.error('Error loading SQL queries:', error);
+        console.error('Error loading data:', error);
         setSqlQueries([]);
+        setLinks([]);
       } finally {
         setDataLoaded(true);
       }
@@ -44,7 +52,16 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ videos, setVideos }) => {
     }
   }, [sqlQueries, dataLoaded]);
 
+  useEffect(() => {
+    if (dataLoaded) {
+      saveLinks(links).catch(console.error);
+    }
+  }, [links, dataLoaded]);
 
+  const showNotification = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
+    setNotification({ message, type });
+    setTimeout(() => setNotification(null), 3000);
+  };
 
   // YouTube ID extractor helper
   const extractVideoId = (url: string) => {
@@ -290,6 +307,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ videos, setVideos }) => {
     }
     setSqlForm({title: '', query: ''});
     setShowSqlForm(false);
+    showNotification(editingSqlId ? 'Query updated successfully!' : 'Query saved successfully!', 'success');
   };
 
   const handleSelectQuery = (query: string) => {
@@ -311,11 +329,67 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ videos, setVideos }) => {
   const handleDeleteSqlQuery = (id: string) => {
     if (window.confirm('Delete this query?')) {
       setSqlQueries(prev => prev.filter(q => q.id !== id));
+      showNotification('Query deleted successfully!', 'success');
     }
   };
 
-  const handleCopySqlQuery = (query: string) => {
-    navigator.clipboard.writeText(query);
+  const handleCopySqlQuery = async (query: string) => {
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(query);
+      } else {
+        // Fallback for mobile/older browsers
+        const textArea = document.createElement('textarea');
+        textArea.value = query;
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-999999px';
+        textArea.style.top = '-999999px';
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        document.execCommand('copy');
+        textArea.remove();
+      }
+      showNotification('Query copied to clipboard!', 'success');
+    } catch (err) {
+      showNotification('Failed to copy query', 'error');
+    }
+  };
+
+  const handleSaveLink = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (editingLinkId) {
+      setLinks(prev => prev.map(l => 
+        l.id === editingLinkId 
+          ? { ...l, title: linkForm.title, url: linkForm.url, description: linkForm.description }
+          : l
+      ));
+      setEditingLinkId(null);
+    } else {
+      const newLink = {
+        id: Date.now().toString(),
+        title: linkForm.title,
+        url: linkForm.url,
+        description: linkForm.description
+      };
+      setLinks(prev => [newLink, ...prev]);
+    }
+    setLinkForm({title: '', url: '', description: ''});
+    setShowLinkForm(false);
+    showNotification(editingLinkId ? 'Link updated successfully!' : 'Link saved successfully!', 'success');
+  };
+
+  const handleEditLink = (link: {id: string, title: string, url: string, description: string}) => {
+    setLinkForm({title: link.title, url: link.url, description: link.description});
+    setEditingLinkId(link.id);
+    setShowLinkForm(true);
+  };
+
+  const handleDeleteLink = (id: string) => {
+    if (window.confirm('Delete this link?')) {
+      setLinks(prev => prev.filter(l => l.id !== id));
+      showNotification('Link deleted successfully!', 'success');
+    }
   };
 
   const handleBulkImport = () => {
@@ -342,6 +416,15 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ videos, setVideos }) => {
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-8">
+      {/* Notification */}
+      {notification && (
+        <div className={`fixed top-4 right-4 z-50 px-6 py-3 rounded-lg shadow-lg text-white font-medium animate-slide-up ${
+          notification.type === 'success' ? 'bg-green-600' :
+          notification.type === 'error' ? 'bg-red-600' : 'bg-blue-600'
+        }`}>
+          {notification.message}
+        </div>
+      )}
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-slate-900 mb-2">Admin Dashboard</h1>
         <p className="text-slate-500">Manage support video content.</p>
@@ -370,6 +453,16 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ videos, setVideos }) => {
             }`}
           >
             SQL Query
+          </button>
+          <button
+            onClick={() => setActiveTab('links')}
+            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+              activeTab === 'links'
+                ? 'bg-white text-blue-600 shadow-sm'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            Useful Links
           </button>
         </div>
       </div>
@@ -502,7 +595,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ videos, setVideos }) => {
               )}
             </div>
         </div>
-      ) : (
+      ) : activeTab === 'sql' ? (
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
           <div className="flex justify-between items-center mb-4">
             <h3 
@@ -558,12 +651,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ videos, setVideos }) => {
                     <h4 className="font-medium text-slate-800">{query.title}</h4>
                     <div className="flex gap-1">
                       <button
-                        onClick={() => handleSelectQuery(query.query)}
-                        className="text-xs text-blue-600 hover:text-blue-800 px-2 py-1 bg-blue-50 rounded"
-                      >
-                        Use
-                      </button>
-                      <button
                         onClick={() => handleEditSqlQuery(query)}
                         className="text-xs text-green-600 hover:text-green-800 px-2 py-1 bg-green-50 rounded"
                       >
@@ -587,6 +674,91 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ videos, setVideos }) => {
                     <summary className="cursor-pointer text-slate-600 hover:text-slate-800">View Query</summary>
                     <pre className="mt-2 p-2 bg-slate-100 rounded text-xs font-mono overflow-x-auto">{query.query}</pre>
                   </details>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      ) : (
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+          <div 
+            className="cursor-pointer hover:bg-slate-50 transition-colors mb-4"
+            onClick={() => setShowLinkForm(!showLinkForm)}
+          >
+            <h3 className="text-lg font-semibold flex items-center gap-2">
+              <Database size={20} className="text-purple-600" />
+              Useful Links
+              <span className="text-sm text-slate-500">(Click to expand)</span>
+            </h3>
+          </div>
+          
+          {showLinkForm && (
+            <form onSubmit={handleSaveLink} className="space-y-4 mb-6 p-4 bg-slate-50 rounded-lg">
+              <input
+                type="text"
+                required
+                value={linkForm.title}
+                onChange={(e) => setLinkForm({...linkForm, title: e.target.value})}
+                className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                placeholder="Link title"
+              />
+              <input
+                type="url"
+                required
+                value={linkForm.url}
+                onChange={(e) => setLinkForm({...linkForm, url: e.target.value})}
+                className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                placeholder="https://example.com"
+              />
+              <textarea
+                required
+                value={linkForm.description}
+                onChange={(e) => setLinkForm({...linkForm, description: e.target.value})}
+                rows={3}
+                className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-sm"
+                placeholder="Brief description of the link"
+              />
+              <button
+                type="submit"
+                className="px-4 py-2 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition-colors flex items-center gap-2"
+              >
+                <Plus size={16} /> Save Link
+              </button>
+            </form>
+          )}
+          
+          <div className="space-y-3">
+            <h4 className="font-medium text-slate-800">Saved Links ({links.length})</h4>
+            {links.length === 0 ? (
+              <p className="text-slate-500 text-sm">No links saved yet.</p>
+            ) : (
+              links.map(link => (
+                <div key={link.id} className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                  <div className="flex justify-between items-start mb-2">
+                    <h5 className="font-medium text-slate-800">
+                      <a href={link.url} target="_blank" rel="noopener noreferrer" className="hover:text-blue-600">
+                        {link.title}
+                      </a>
+                    </h5>
+                    <div className="flex gap-1">
+                      <button
+                        onClick={() => handleEditLink(link)}
+                        className="text-blue-500 hover:text-blue-700 p-1"
+                      >
+                        <Pencil size={14} />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteLink(link.id)}
+                        className="text-red-500 hover:text-red-700 p-1"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  </div>
+                  <p className="text-slate-600 text-xs mb-2">{link.description}</p>
+                  <a href={link.url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline">
+                    {link.url}
+                  </a>
                 </div>
               ))
             )}
