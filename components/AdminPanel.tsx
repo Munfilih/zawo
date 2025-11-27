@@ -11,6 +11,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ videos, setVideos }) => {
   const [activeTab, setActiveTab] = useState<'videos' | 'sql'>('videos');
   const [sqlQueries, setSqlQueries] = useState<{id: string, title: string, query: string}[]>([]);
   const [sqlForm, setSqlForm] = useState({title: '', query: ''});
+  const [showSqlForm, setShowSqlForm] = useState(false);
+  const [sqlSearch, setSqlSearch] = useState('');
   const [formData, setFormData] = useState({ title: '', description: '', url: '' });
   const [editingId, setEditingId] = useState<string | null>(null);
 
@@ -94,7 +96,13 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ videos, setVideos }) => {
 
   const handleSelectQuery = (query: string) => {
     setSqlForm(prev => ({...prev, query}));
+    setShowSqlForm(true);
   };
+
+  const filteredSqlQueries = sqlQueries.filter(q => 
+    q.title.toLowerCase().includes(sqlSearch.toLowerCase()) || 
+    q.query.toLowerCase().includes(sqlSearch.toLowerCase())
+  );
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-8">
@@ -250,67 +258,73 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ videos, setVideos }) => {
             </div>
         </div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-            <h3 className="text-lg font-semibold mb-4">Save SQL Query</h3>
-            <form onSubmit={handleSaveSqlQuery} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Query Title</label>
-                <input
-                  type="text"
-                  required
-                  value={sqlForm.title}
-                  onChange={(e) => setSqlForm({...sqlForm, title: e.target.value})}
-                  className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                  placeholder="e.g. Get all videos"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">SQL Query</label>
-                <textarea
-                  required
-                  value={sqlForm.query}
-                  onChange={(e) => setSqlForm({...sqlForm, query: e.target.value})}
-                  rows={6}
-                  className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-mono text-sm"
-                  placeholder="SELECT * FROM videos WHERE..."
-                />
-              </div>
-              <button
-                type="submit"
-                className="w-full py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
-              >
-                <Save size={18} />
-                Save Query
-              </button>
-            </form>
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+          <div className="flex justify-between items-center mb-4">
+            <h3 
+              className="text-lg font-semibold cursor-pointer hover:text-blue-600 transition-colors"
+              onClick={() => setShowSqlForm(!showSqlForm)}
+            >
+              Useful Queries {showSqlForm ? '▼' : '▶'}
+            </h3>
+            <input
+              type="text"
+              placeholder="Search queries..."
+              value={sqlSearch}
+              onChange={(e) => setSqlSearch(e.target.value)}
+              className="px-3 py-1 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+            />
           </div>
           
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-            <h3 className="text-lg font-semibold mb-4">Saved Queries ({sqlQueries.length})</h3>
-            <div className="space-y-3">
-              {sqlQueries.length === 0 ? (
-                <p className="text-slate-500 text-center py-8">No saved queries yet.</p>
-              ) : (
-                sqlQueries.map(query => (
-                  <div key={query.id} className="border border-slate-200 rounded-lg p-3 hover:bg-slate-50 transition-colors">
-                    <div className="flex justify-between items-start mb-2">
-                      <h4 className="font-medium text-slate-800">{query.title}</h4>
-                      <button
-                        onClick={() => handleSelectQuery(query.query)}
-                        className="text-xs text-blue-600 hover:text-blue-800 px-2 py-1 bg-blue-50 rounded"
-                      >
-                        Use
-                      </button>
-                    </div>
-                    <details className="text-sm">
-                      <summary className="cursor-pointer text-slate-600 hover:text-slate-800">View Query</summary>
-                      <pre className="mt-2 p-2 bg-slate-100 rounded text-xs font-mono overflow-x-auto">{query.query}</pre>
-                    </details>
+          {showSqlForm && (
+            <form onSubmit={handleSaveSqlQuery} className="space-y-4 mb-6 p-4 bg-slate-50 rounded-lg">
+              <input
+                type="text"
+                required
+                value={sqlForm.title}
+                onChange={(e) => setSqlForm({...sqlForm, title: e.target.value})}
+                className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                placeholder="Query title"
+              />
+              <textarea
+                required
+                value={sqlForm.query}
+                onChange={(e) => setSqlForm({...sqlForm, query: e.target.value})}
+                rows={4}
+                className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-mono text-sm"
+                placeholder="SQL query"
+              />
+              <button
+                type="submit"
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+              >
+                <Save size={16} />
+                Save
+              </button>
+            </form>
+          )}
+          
+          <div className="space-y-3">
+            {filteredSqlQueries.length === 0 ? (
+              <p className="text-slate-500 text-center py-8">{sqlQueries.length === 0 ? 'No saved queries yet.' : 'No queries match your search.'}</p>
+            ) : (
+              filteredSqlQueries.map(query => (
+                <div key={query.id} className="border border-slate-200 rounded-lg p-3 hover:bg-slate-50 transition-colors">
+                  <div className="flex justify-between items-start mb-2">
+                    <h4 className="font-medium text-slate-800">{query.title}</h4>
+                    <button
+                      onClick={() => handleSelectQuery(query.query)}
+                      className="text-xs text-blue-600 hover:text-blue-800 px-2 py-1 bg-blue-50 rounded"
+                    >
+                      Use
+                    </button>
                   </div>
-                ))
-              )}
-            </div>
+                  <details className="text-sm">
+                    <summary className="cursor-pointer text-slate-600 hover:text-slate-800">View Query</summary>
+                    <pre className="mt-2 p-2 bg-slate-100 rounded text-xs font-mono overflow-x-auto">{query.query}</pre>
+                  </details>
+                </div>
+              ))
+            )}
           </div>
         </div>
       )}
