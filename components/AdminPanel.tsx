@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Video } from '../types';
 import { Save, Plus, Trash2, Video as VideoIcon, Youtube, Pencil, X } from 'lucide-react';
+import { saveSqlQueries, loadSqlQueries } from '../services/firebaseService';
 
 interface AdminPanelProps {
   videos: Video[];
@@ -8,6 +9,22 @@ interface AdminPanelProps {
 }
 
 const AdminPanel: React.FC<AdminPanelProps> = ({ videos, setVideos }) => {
+  
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const loadedQueries = await loadSqlQueries();
+        setSqlQueries(loadedQueries);
+      } catch (error) {
+        console.error('Error loading SQL queries:', error);
+      }
+    };
+    loadData();
+  }, []);
+
+  useEffect(() => {
+    saveSqlQueries(sqlQueries).catch(console.error);
+  }, [sqlQueries]);
   const [activeTab, setActiveTab] = useState<'videos' | 'sql'>('videos');
   const [sqlQueries, setSqlQueries] = useState<{id: string, title: string, query: string}[]>([]);
   const [sqlForm, setSqlForm] = useState({title: '', query: ''});

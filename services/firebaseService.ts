@@ -4,6 +4,7 @@ import { Video } from "../types";
 
 const COLLECTION_NAME = "supportApp";
 const VIDEOS_DOC = "videos";
+const SQL_QUERIES_DOC = "sqlQueries";
 
 export const saveVideos = async (videos: Video[]) => {
   console.log('Saving videos to Firebase:', videos);
@@ -20,6 +21,20 @@ export const loadVideos = async (): Promise<Video[]> => {
     return data.videos || [];
   }
   console.log('No videos document found in Firebase');
+  return [];
+};
+
+export const saveSqlQueries = async (queries: {id: string, title: string, query: string}[]) => {
+  await setDoc(doc(db, COLLECTION_NAME, SQL_QUERIES_DOC), { queries });
+};
+
+export const loadSqlQueries = async (): Promise<{id: string, title: string, query: string}[]> => {
+  const docRef = doc(db, COLLECTION_NAME, SQL_QUERIES_DOC);
+  const docSnap = await getDoc(docRef);
+  if (docSnap.exists()) {
+    const data = docSnap.data();
+    return data.queries || [];
+  }
   return [];
 };
 
