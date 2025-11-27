@@ -13,6 +13,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ videos, setVideos }) => {
   const [sqlForm, setSqlForm] = useState({title: '', query: ''});
   const [showSqlForm, setShowSqlForm] = useState(false);
   const [sqlSearch, setSqlSearch] = useState('');
+  const [editingSqlId, setEditingSqlId] = useState<string | null>(null);
   const [formData, setFormData] = useState({ title: '', description: '', url: '' });
   const [editingId, setEditingId] = useState<string | null>(null);
 
@@ -85,13 +86,23 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ videos, setVideos }) => {
 
   const handleSaveSqlQuery = (e: React.FormEvent) => {
     e.preventDefault();
-    const newQuery = {
-      id: Date.now().toString(),
-      title: sqlForm.title,
-      query: sqlForm.query
-    };
-    setSqlQueries(prev => [newQuery, ...prev]);
+    if (editingSqlId) {
+      setSqlQueries(prev => prev.map(q => 
+        q.id === editingSqlId 
+          ? { ...q, title: sqlForm.title, query: sqlForm.query }
+          : q
+      ));
+      setEditingSqlId(null);
+    } else {
+      const newQuery = {
+        id: Date.now().toString(),
+        title: sqlForm.title,
+        query: sqlForm.query
+      };
+      setSqlQueries(prev => [newQuery, ...prev]);
+    }
     setSqlForm({title: '', query: ''});
+    setShowSqlForm(false);
   };
 
   const handleSelectQuery = (query: string) => {
@@ -103,6 +114,22 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ videos, setVideos }) => {
     q.title.toLowerCase().includes(sqlSearch.toLowerCase()) || 
     q.query.toLowerCase().includes(sqlSearch.toLowerCase())
   );
+
+  const handleEditSqlQuery = (query: {id: string, title: string, query: string}) => {
+    setSqlForm({title: query.title, query: query.query});
+    setEditingSqlId(query.id);
+    setShowSqlForm(true);
+  };
+
+  const handleDeleteSqlQuery = (id: string) => {
+    if (window.confirm('Delete this query?')) {
+      setSqlQueries(prev => prev.filter(q => q.id !== id));
+    }
+  };
+
+  const handleCopySqlQuery = (query: string) => {
+    navigator.clipboard.writeText(query);
+  };
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-8">
@@ -311,12 +338,32 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ videos, setVideos }) => {
                 <div key={query.id} className="border border-slate-200 rounded-lg p-3 hover:bg-slate-50 transition-colors">
                   <div className="flex justify-between items-start mb-2">
                     <h4 className="font-medium text-slate-800">{query.title}</h4>
-                    <button
-                      onClick={() => handleSelectQuery(query.query)}
-                      className="text-xs text-blue-600 hover:text-blue-800 px-2 py-1 bg-blue-50 rounded"
-                    >
-                      Use
-                    </button>
+                    <div className="flex gap-1">
+                      <button
+                        onClick={() => handleSelectQuery(query.query)}
+                        className="text-xs text-blue-600 hover:text-blue-800 px-2 py-1 bg-blue-50 rounded"
+                      >
+                        Use
+                      </button>
+                      <button
+                        onClick={() => handleEditSqlQuery(query)}
+                        className="text-xs text-green-600 hover:text-green-800 px-2 py-1 bg-green-50 rounded"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => handleCopySqlQuery(query.query)}
+                        className="text-xs text-purple-600 hover:text-purple-800 px-2 py-1 bg-purple-50 rounded"
+                      >
+                        Copy
+                      </button>
+                      <button
+                        onClick={() => handleDeleteSqlQuery(query.id)}
+                        className="text-xs text-red-600 hover:text-red-800 px-2 py-1 bg-red-50 rounded"
+                      >
+                        Del
+                      </button>
+                    </div>
                   </div>
                   <details className="text-sm">
                     <summary className="cursor-pointer text-slate-600 hover:text-slate-800">View Query</summary>
