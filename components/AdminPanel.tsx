@@ -23,7 +23,9 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ videos, setVideos }) => {
   }, []);
 
   useEffect(() => {
-    saveSqlQueries(sqlQueries).catch(console.error);
+    if (sqlQueries.length > 0) {
+      saveSqlQueries(sqlQueries).catch(console.error);
+    }
   }, [sqlQueries]);
   const [activeTab, setActiveTab] = useState<'videos' | 'sql'>('videos');
   const [sqlQueries, setSqlQueries] = useState<{id: string, title: string, query: string}[]>([]);
