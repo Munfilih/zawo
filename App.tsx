@@ -130,10 +130,14 @@ const App: React.FC = () => {
             </div>
           </div>
         ) : currentView === AppView.ADMIN ? (
-          <AdminPanel 
-            videos={videos} 
-            setVideos={setVideos}
-          />
+          (() => {
+            try {
+              return <AdminPanel videos={videos} setVideos={setVideos} />;
+            } catch (error) {
+              console.error('AdminPanel error:', error);
+              return <div className="p-8 text-center">Error loading admin panel. Check console.</div>;
+            }
+          })()
         ) : (
           /* Customer View */
           <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-8 py-6 sm:py-12">

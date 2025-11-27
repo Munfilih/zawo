@@ -9,24 +9,6 @@ interface AdminPanelProps {
 }
 
 const AdminPanel: React.FC<AdminPanelProps> = ({ videos, setVideos }) => {
-  
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        const loadedQueries = await loadSqlQueries();
-        setSqlQueries(loadedQueries);
-      } catch (error) {
-        console.error('Error loading SQL queries:', error);
-      }
-    };
-    loadData();
-  }, []);
-
-  useEffect(() => {
-    if (sqlQueries.length > 0) {
-      saveSqlQueries(sqlQueries).catch(console.error);
-    }
-  }, [sqlQueries]);
   const [activeTab, setActiveTab] = useState<'videos' | 'sql'>('videos');
   const [sqlQueries, setSqlQueries] = useState<{id: string, title: string, query: string}[]>([]);
   const [sqlForm, setSqlForm] = useState({title: '', query: ''});
@@ -39,6 +21,28 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ videos, setVideos }) => {
   const [selectedVideos, setSelectedVideos] = useState<string[]>([]);
   const [showChannelVideos, setShowChannelVideos] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [dataLoaded, setDataLoaded] = useState(false);
+  
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const loadedQueries = await loadSqlQueries();
+        setSqlQueries(loadedQueries);
+      } catch (error) {
+        console.error('Error loading SQL queries:', error);
+        setSqlQueries([]);
+      } finally {
+        setDataLoaded(true);
+      }
+    };
+    loadData();
+  }, []);
+
+  useEffect(() => {
+    if (dataLoaded) {
+      saveSqlQueries(sqlQueries).catch(console.error);
+    }
+  }, [sqlQueries, dataLoaded]);
 
 
 
@@ -50,37 +54,144 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ videos, setVideos }) => {
   };
 
   const extractChannelId = (url: string) => {
-    const channelMatch = url.match(/youtube\.com\/(channel\/|c\/|user\/)([^/?]+)/);
-    return channelMatch ? channelMatch[2] : null;
+    // For video URLs, we'll use the video ID to get channel info
+    const videoId = extractVideoId(url);
+    return videoId; // Return videoId as placeholder for channel lookup
   };
 
   const fetchVideoMetadata = async (videoId: string) => {
     try {
-      // Mock API call - replace with actual YouTube API
-      const mockData = {
-        title: `Video Title for ${videoId}`,
-        description: `Auto-generated description for video ${videoId}`
-      };
-      return mockData;
+      const response = await fetch(`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`);
+      if (response.ok) {
+        const data = await response.json();
+        return {
+          title: data.title || `Video ${videoId}`,
+          description: ''
+        };
+      }
+      throw new Error('Failed to fetch');
     } catch (error) {
       console.error('Error fetching video metadata:', error);
-      return null;
+      return {
+        title: `YouTube Video ${videoId}`,
+        description: ''
+      };
     }
   };
 
-  const fetchChannelVideos = async (channelId: string) => {
+  const fetchYouTubeVideos = async (searchQuery: string) => {
     try {
       setLoading(true);
-      // Mock API call - replace with actual YouTube API
+      
+      // Use environment variable or show message
+      const API_KEY = process.env.REACT_APP_YOUTUBE_API_KEY;
+      
+      if (!API_KEY) {
+        alert('YouTube API key not configured. Add REACT_APP_YOUTUBE_API_KEY to your .env file.');
+        // Show mock results as fallback
+        const mockResults = [
+          { id: 'mock1', title: `${searchQuery} Tutorial`, description: 'Tutorial video', videoId: 'dQw4w9WgXcQ' },
+          { id: 'mock2', title: `${searchQuery} Guide`, description: 'How-to guide', videoId: 'oHg5SJYRHA0' },
+          { id: 'mock3', title: `${searchQuery} Tips`, description: 'Tips and tricks', videoId: 'ZZ5LpwO-An4' }
+        ];
+        setChannelVideos(mockResults);
+        return;
+      }
+      
+      const response = await fetch(
+        `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(searchQuery)}&type=video&maxResults=10&key=${API_KEY}`
+      );
+      
+      if (!response.ok) {
+        throw new Error('Search failed');
+      }
+      
+      const data = await response.json();
+      
+      const videos = data.items.map((item: any) => ({
+        id: item.id.videoId,
+        title: item.snippet.title,
+        description: item.snippet.description,
+        videoId: item.id.videoId
+      }));
+      
+      setChannelVideos(videos);
+      
+    } catch (error) {
+      console.error('Error searching YouTube:', error);
+      alert('YouTube search failed. Using mock results.');
+      // Fallback to mock data
+      const mockResults = [
+        { id: 'fb1', title: `${searchQuery} Video 1`, description: 'Sample video', videoId: 'dQw4w9WgXcQ' },
+        { id: 'fb2', title: `${searchQuery} Video 2`, description: 'Another sample', videoId: 'oHg5SJYRHA0' }
+      ];
+      setChannelVideos(mockResults);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchChannelVideos = async (videoId: string) => {
+    try {
+      setLoading(true);
+      
+      // You need to add your YouTube Data API key here
+      const API_KEY = 'YOUR_YOUTUBE_API_KEY'; // Replace with actual API key
+      
+      if (!API_KEY || API_KEY === 'YOUR_YOUTUBE_API_KEY') {
+        alert('YouTube API key required. Please add your API key to fetch real channel videos.');
+        return;
+      }
+      
+      // Get video details to find channel ID
+      const videoResponse = await fetch(
+        `https://www.googleapis.com/youtube/v3/videos?part=snippet&id=${videoId}&key=${API_KEY}`
+      );
+      
+      if (!videoResponse.ok) {
+        throw new Error('Failed to fetch video details');
+      }
+      
+      const videoData = await videoResponse.json();
+      
+      if (!videoData.items || videoData.items.length === 0) {
+        throw new Error('Video not found');
+      }
+      
+      const channelId = videoData.items[0].snippet.channelId;
+      
+      // Get channel videos
+      const channelResponse = await fetch(
+        `https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${channelId}&type=video&maxResults=10&order=date&key=${API_KEY}`
+      );
+      
+      if (!channelResponse.ok) {
+        throw new Error('Failed to fetch channel videos');
+      }
+      
+      const channelData = await channelResponse.json();
+      
+      const videos = channelData.items.map((item: any) => ({
+        id: item.id.videoId,
+        title: item.snippet.title,
+        description: item.snippet.description,
+        videoId: item.id.videoId
+      }));
+      
+      setChannelVideos(videos);
+      setShowChannelVideos(true);
+      
+    } catch (error) {
+      console.error('Error fetching channel videos:', error);
+      alert('Could not load channel videos. Using mock data instead.');
+      
+      // Fallback to mock data
       const mockVideos = [
-        { id: 'vid1', title: 'Channel Video 1', description: 'Description 1', videoId: 'dQw4w9WgXcQ' },
-        { id: 'vid2', title: 'Channel Video 2', description: 'Description 2', videoId: 'dQw4w9WgXcQ' },
-        { id: 'vid3', title: 'Channel Video 3', description: 'Description 3', videoId: 'dQw4w9WgXcQ' }
+        { id: 'mock1', title: 'Sample Video 1', description: 'Mock video description', videoId: 'dQw4w9WgXcQ' },
+        { id: 'mock2', title: 'Sample Video 2', description: 'Another mock video', videoId: 'oHg5SJYRHA0' }
       ];
       setChannelVideos(mockVideos);
       setShowChannelVideos(true);
-    } catch (error) {
-      console.error('Error fetching channel videos:', error);
     } finally {
       setLoading(false);
     }
@@ -285,17 +396,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ videos, setVideos }) => {
                 </div>
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Video Title</label>
-                    <input
-                      type="text"
-                      required
-                      value={formData.title}
-                      onChange={e => setFormData({ ...formData, title: e.target.value })}
-                      className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
-                      placeholder="e.g. How to Reset Password"
-                    />
-                  </div>
-                  <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">YouTube URL</label>
                     <input
                       type="url"
@@ -305,26 +405,25 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ videos, setVideos }) => {
                       className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                       placeholder="https://youtube.com/watch?v=..."
                     />
-                    <div className="flex gap-2 mt-2">
-                      <button
-                        type="button"
-                        onClick={handleFetchDetails}
-                        disabled={!formData.url || loading}
-                        className="px-3 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 disabled:bg-gray-400"
-                      >
-                        {loading ? 'Loading...' : 'Fetch Details'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const channelId = extractChannelId(formData.url);
-                          if (channelId) fetchChannelVideos(channelId);
-                        }}
-                        className="px-3 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700"
-                      >
-                        Channel Videos
-                      </button>
-                    </div>
+                    <button
+                      type="button"
+                      onClick={handleFetchDetails}
+                      disabled={!formData.url || loading}
+                      className="mt-2 px-3 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 disabled:bg-gray-400"
+                    >
+                      {loading ? 'Loading...' : 'Fetch Details'}
+                    </button>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Video Title</label>
+                    <input
+                      type="text"
+                      required
+                      value={formData.title}
+                      onChange={e => setFormData({ ...formData, title: e.target.value })}
+                      className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                      placeholder="e.g. How to Reset Password"
+                    />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">Description</label>
@@ -350,50 +449,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ videos, setVideos }) => {
                   </button>
                 </form>
               </div>
-              
-              {showChannelVideos && (
-                <div className="mt-4 bg-white p-4 rounded-xl border border-slate-200">
-                  <div className="flex justify-between items-center mb-3">
-                    <h4 className="font-semibold">Channel Videos ({channelVideos.length})</h4>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={handleBulkImport}
-                        disabled={selectedVideos.length === 0}
-                        className="px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700 disabled:bg-gray-400"
-                      >
-                        Add Selected ({selectedVideos.length})
-                      </button>
-                      <button
-                        onClick={() => setShowChannelVideos(false)}
-                        className="px-3 py-1 bg-gray-500 text-white rounded text-sm hover:bg-gray-600"
-                      >
-                        Close
-                      </button>
-                    </div>
-                  </div>
-                  <div className="max-h-60 overflow-y-auto space-y-2">
-                    {channelVideos.map(video => (
-                      <div key={video.id} className="flex items-start gap-3 p-2 border rounded hover:bg-slate-50">
-                        <input
-                          type="checkbox"
-                          checked={selectedVideos.includes(video.id)}
-                          onChange={() => toggleVideoSelection(video.id)}
-                          className="mt-1"
-                        />
-                        <img 
-                          src={`https://img.youtube.com/vi/${video.videoId}/mqdefault.jpg`}
-                          alt={video.title}
-                          className="w-16 h-12 object-cover rounded"
-                        />
-                        <div className="flex-1">
-                          <h5 className="font-medium text-sm">{video.title}</h5>
-                          <p className="text-xs text-slate-600 line-clamp-2">{video.description}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+
             </div>
 
             {/* Video List */}
