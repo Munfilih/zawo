@@ -148,7 +148,7 @@ const App: React.FC = () => {
                 How can we help you today?
               </h1>
               <p className="text-base sm:text-lg text-slate-600 max-w-2xl mx-auto px-4">
-                Browse our video library for quick tutorials or chat with our AI assistant for instant support.
+                Browse our video library for quick tutorials and instant support.
               </p>
               
               {/* Search Bar */}
