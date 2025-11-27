@@ -9,8 +9,8 @@ interface AdminPanelProps {
 
 const AdminPanel: React.FC<AdminPanelProps> = ({ videos, setVideos }) => {
   const [activeTab, setActiveTab] = useState<'videos' | 'sql'>('videos');
-  const [sqlQuery, setSqlQuery] = useState('');
-  const [sqlResults, setSqlResults] = useState<any[]>([]);
+  const [sqlQueries, setSqlQueries] = useState<{id: string, title: string, query: string}[]>([]);
+  const [sqlForm, setSqlForm] = useState({title: '', query: ''});
   const [formData, setFormData] = useState({ title: '', description: '', url: '' });
   const [editingId, setEditingId] = useState<string | null>(null);
 
@@ -81,18 +81,19 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ videos, setVideos }) => {
     }
   };
 
-  const handleSqlQuery = () => {
-    try {
-      // Mock SQL execution - replace with actual database query
-      const mockResults = [
-        { id: 1, title: 'Sample Video 1', views: 150 },
-        { id: 2, title: 'Sample Video 2', views: 89 }
-      ];
-      setSqlResults(mockResults);
-    } catch (error) {
-      console.error('SQL Query Error:', error);
-      setSqlResults([]);
-    }
+  const handleSaveSqlQuery = (e: React.FormEvent) => {
+    e.preventDefault();
+    const newQuery = {
+      id: Date.now().toString(),
+      title: sqlForm.title,
+      query: sqlForm.query
+    };
+    setSqlQueries(prev => [newQuery, ...prev]);
+    setSqlForm({title: '', query: ''});
+  };
+
+  const handleSelectQuery = (query: string) => {
+    setSqlForm(prev => ({...prev, query}));
   };
 
   return (
@@ -249,54 +250,67 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ videos, setVideos }) => {
             </div>
         </div>
       ) : (
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
-          <h3 className="text-lg font-semibold mb-4">SQL Query Interface</h3>
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">SQL Query</label>
-              <textarea
-                value={sqlQuery}
-                onChange={(e) => setSqlQuery(e.target.value)}
-                rows={6}
-                className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-mono text-sm"
-                placeholder="SELECT * FROM videos WHERE..."
-              />
-            </div>
-            <button
-              onClick={handleSqlQuery}
-              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              Execute Query
-            </button>
-            {sqlResults.length > 0 && (
-              <div className="mt-6">
-                <h4 className="text-md font-semibold mb-2">Results:</h4>
-                <div className="overflow-x-auto">
-                  <table className="min-w-full border border-slate-200 rounded-lg">
-                    <thead className="bg-slate-50">
-                      <tr>
-                        {Object.keys(sqlResults[0]).map(key => (
-                          <th key={key} className="px-4 py-2 text-left text-sm font-medium text-slate-700 border-b">
-                            {key}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {sqlResults.map((row, index) => (
-                        <tr key={index} className="border-b">
-                          {Object.values(row).map((value, i) => (
-                            <td key={i} className="px-4 py-2 text-sm text-slate-600">
-                              {String(value)}
-                            </td>
-                          ))}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+            <h3 className="text-lg font-semibold mb-4">Save SQL Query</h3>
+            <form onSubmit={handleSaveSqlQuery} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Query Title</label>
+                <input
+                  type="text"
+                  required
+                  value={sqlForm.title}
+                  onChange={(e) => setSqlForm({...sqlForm, title: e.target.value})}
+                  className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                  placeholder="e.g. Get all videos"
+                />
               </div>
-            )}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">SQL Query</label>
+                <textarea
+                  required
+                  value={sqlForm.query}
+                  onChange={(e) => setSqlForm({...sqlForm, query: e.target.value})}
+                  rows={6}
+                  className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-mono text-sm"
+                  placeholder="SELECT * FROM videos WHERE..."
+                />
+              </div>
+              <button
+                type="submit"
+                className="w-full py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+              >
+                <Save size={18} />
+                Save Query
+              </button>
+            </form>
+          </div>
+          
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+            <h3 className="text-lg font-semibold mb-4">Saved Queries ({sqlQueries.length})</h3>
+            <div className="space-y-3">
+              {sqlQueries.length === 0 ? (
+                <p className="text-slate-500 text-center py-8">No saved queries yet.</p>
+              ) : (
+                sqlQueries.map(query => (
+                  <div key={query.id} className="border border-slate-200 rounded-lg p-3 hover:bg-slate-50 transition-colors">
+                    <div className="flex justify-between items-start mb-2">
+                      <h4 className="font-medium text-slate-800">{query.title}</h4>
+                      <button
+                        onClick={() => handleSelectQuery(query.query)}
+                        className="text-xs text-blue-600 hover:text-blue-800 px-2 py-1 bg-blue-50 rounded"
+                      >
+                        Use
+                      </button>
+                    </div>
+                    <details className="text-sm">
+                      <summary className="cursor-pointer text-slate-600 hover:text-slate-800">View Query</summary>
+                      <pre className="mt-2 p-2 bg-slate-100 rounded text-xs font-mono overflow-x-auto">{query.query}</pre>
+                    </details>
+                  </div>
+                ))
+              )}
+            </div>
           </div>
         </div>
       )}
