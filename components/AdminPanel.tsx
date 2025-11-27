@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Video } from '../types';
 import { Save, Plus, Trash2, Video as VideoIcon, Youtube, Pencil, X } from 'lucide-react';
 import { saveSqlQueries, loadSqlQueries } from '../services/firebaseService';
@@ -84,10 +84,10 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ videos, setVideos }) => {
     }
   };
 
-  const handleUrlChange = async (url: string) => {
-    setFormData({ ...formData, url });
-    const videoId = extractVideoId(url);
-    if (videoId && !editingId) {
+  const handleFetchDetails = async () => {
+    const videoId = extractVideoId(formData.url);
+    if (videoId) {
+      setLoading(true);
       const metadata = await fetchVideoMetadata(videoId);
       if (metadata) {
         setFormData(prev => ({
@@ -96,6 +96,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ videos, setVideos }) => {
           description: metadata.description
         }));
       }
+      setLoading(false);
     }
   };
 
@@ -298,20 +299,30 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ videos, setVideos }) => {
                       type="url"
                       required
                       value={formData.url}
-                      onChange={e => handleUrlChange(e.target.value)}
+                      onChange={e => setFormData({ ...formData, url: e.target.value })}
                       className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
                       placeholder="https://youtube.com/watch?v=..."
                     />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const channelId = extractChannelId(formData.url);
-                        if (channelId) fetchChannelVideos(channelId);
-                      }}
-                      className="mt-2 text-xs text-blue-600 hover:text-blue-800 px-3 py-1 bg-blue-50 rounded"
-                    >
-                      Add Other Videos from Channel
-                    </button>
+                    <div className="flex gap-2 mt-2">
+                      <button
+                        type="button"
+                        onClick={handleFetchDetails}
+                        disabled={!formData.url || loading}
+                        className="px-3 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 disabled:bg-gray-400"
+                      >
+                        {loading ? 'Loading...' : 'Fetch Details'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const channelId = extractChannelId(formData.url);
+                          if (channelId) fetchChannelVideos(channelId);
+                        }}
+                        className="px-3 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700"
+                      >
+                        Channel Videos
+                      </button>
+                    </div>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">Description</label>
